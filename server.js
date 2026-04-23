@@ -11,18 +11,43 @@ const sendResponse = (res, statusCode, data, contentType = 'application/json') =
 const addTarget = async (target) => {
     const data = await fs.promises.readFile(targets_path, 'utf-8');
     const targets = JSON.parse(data);
-    
+
     const newId = targets.length > 0 ? targets[targets.length - 1].id + 1 : 1;
     target.id = newId;
     target.logged_at = new Date().toISOString();
-    
+
     targets.push(target);
     await fs.promises.writeFile(targets_path, JSON.stringify(targets, null, 2));
     return target;
 };
 
-const server = http.createServer(async (req, res) => {
+const updateTarget = async (target) => {
+    const data = await fs.promises.readFile(targets_path, 'utf-8');
+    const targets = JSON.parse(data);
+    const index = targets.findIndex(t => t.id == target.id);
+    
+    if (index !== -1) {
+        targets[index] = { ...targets[index], ...target, updated_at: new Date().toISOString() };
+        await fs.promises.writeFile(targets_path, JSON.stringify(targets, null, 2));
+    }
+    return target;
+};
 
+const deleteTarget = async (id) => {
+    const data = await fs.promises.readFile(targets_path, 'utf-8');
+    const targets = JSON.parse(data || '[]');
+    const index = targets.findIndex(t => t.id == id);
+    
+    if (index !== -1) {
+        const deletedTarget = targets.splice(index, 1)[0];
+        await fs.promises.writeFile(targets_path, JSON.stringify(targets, null, 2));
+        return deletedTarget;
+    }
+    return null;
+};
+
+const server = http.createServer(async (req, res) => {
+    
     if(req.url == '/api/targets' && req.method == 'GET') {
         const data = await fs.promises.readFile(targets_path, 'utf-8');
         const targets = JSON.parse(data);
@@ -39,7 +64,7 @@ const server = http.createServer(async (req, res) => {
         }else{
             sendResponse(res, 404, 'Target Not Found', 'text/plain');
         }
-    }else if(req.url == '/api/add-target' && req.method == 'POST'){
+    }else if(req.url == '/api/targets' && req.method == 'POST'){
         let body = '';
         req.on('data', chunk => {
             body += chunk.toString();
@@ -54,6 +79,31 @@ const server = http.createServer(async (req, res) => {
                 sendResponse(res, 400, 'Invalid JSON', 'text/plain');
             }
         });
+    }else if(req.url.startsWith('/api/targets/') && req.method == 'PUT') {
+        let body = '';
+        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('end', async () => {
+            try {
+                const targetID = req.url.split('/')[3];
+                const updatedData = JSON.parse(body);
+                updatedData.id = parseInt(targetID);
+                const result = await updateTarget(updatedData);
+                sendResponse(res, 200, result);
+            } catch (error) {
+                sendResponse(res, 400, 'Invalid JSON', 'text/plain');
+            }
+        });
+    } 
+    else if(req.url.startsWith('/api/targets/') && req.method == 'DELETE') {
+        (async () => {
+            const targetID = req.url.split('/')[3];
+            const result = await deleteTarget(parseInt(targetID));
+            if (result) {
+                sendResponse(res, 200, result);
+            } else {
+                sendResponse(res, 404, 'Target Not Found', 'text/plain');
+            }
+        })();
     }else {
         sendResponse(res, 404, 'Not Found', 'text/plain');
     }
