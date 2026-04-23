@@ -47,7 +47,7 @@ const deleteTarget = async (id) => {
 };
 
 const server = http.createServer(async (req, res) => {
-    
+
     if(req.url == '/api/targets' && req.method == 'GET') {
         const data = await fs.promises.readFile(targets_path, 'utf-8');
         const targets = JSON.parse(data);
@@ -73,6 +73,17 @@ const server = http.createServer(async (req, res) => {
         req.on('end', async () => {
             try{
                 const newTarget = JSON.parse(body);
+                
+                newTarget.target_ip = newTarget.target_ip || "";
+                newTarget.hostname = newTarget.hostname || "";
+                newTarget.vulnerability_type = newTarget.vulnerability_type || "";
+                newTarget.vulnerability_severity = newTarget.vulnerability_severity || "";
+                newTarget.status = newTarget.status || "";
+                newTarget.access_level = newTarget.access_level || "";
+                newTarget.os_info = newTarget.os_info || "";
+                newTarget.open_ports = newTarget.open_ports || [];
+                newTarget.notes = newTarget.notes || "";
+                
                 const addedTarget = await addTarget(newTarget);
                 sendResponse(res, 201, addedTarget);
             }catch(error){
@@ -93,7 +104,7 @@ const server = http.createServer(async (req, res) => {
                 sendResponse(res, 400, 'Invalid JSON', 'text/plain');
             }
         });
-    } 
+    }
     else if(req.url.startsWith('/api/targets/') && req.method == 'DELETE') {
         (async () => {
             const targetID = req.url.split('/')[3];
